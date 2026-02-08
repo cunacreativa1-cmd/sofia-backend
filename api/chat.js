@@ -21,7 +21,7 @@ export default async function handler(req, res) {
     const { message } = req.body;
 
     const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: "gpt-4.1-mini",
       messages: [
         { role: "system", content: "Eres Sofía, asistente de Cuna Creativa." },
         { role: "user", content: message }
