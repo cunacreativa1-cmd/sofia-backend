@@ -1,10 +1,7 @@
 import OpenAI from "openai";
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
 export default async function handler(req, res) {
+  // CORS
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
@@ -13,15 +10,23 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
-  if (req.method !== "POST") {
-    return res.status(405).json({ error: "Método no permitido" });
-  }
-
   try {
-    const { message } = req.body;
+    if (!process.env.OPENAI_API_KEY) {
+      throw new Error("OPENAI_API_KEY no definida");
+    }
+
+    const openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    });
+
+    const { message } = req.body || {};
+
+    if (!message) {
+      return res.status(400).json({ message: "Mensaje vacío" });
+    }
 
     const completion = await openai.chat.completions.create({
-      model: "gpt-4.1-mini",
+      model: "gpt-4o-mini",
       messages: [
         { role: "system", content: "Eres Sofía, la asistente virtual de ventas de Cuna Creativa.
 
@@ -81,13 +86,21 @@ ESTILO DE RESPUESTA:
 - Nunca mencionas que eres una IA ni que usas ChatGPT." },
         { role: "user", content: message }
       ],
-      max_tokens: 200
+      max_tokens: 150,
+      temperature: 0.4,
     });
 
-    res.status(200).json({
-      reply: completion.choices[0].message.content
-    });
+    const reply =
+      completion.choices?.[0]?.message?.content ||
+      "¿Te gustaría continuar por WhatsApp?";
+
+    return res.status(200).json({ message: reply });
+
   } catch (error) {
-    res.status(500).json({ error: "Error interno" });
+    console.error("ERROR BACKEND:", error);
+    return res.status(500).json({
+      message:
+        "Estoy teniendo un problema técnico. ¿Prefieres que sigamos por WhatsApp?"
+    });
   }
 }
