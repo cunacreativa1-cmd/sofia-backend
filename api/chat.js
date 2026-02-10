@@ -48,6 +48,8 @@ export default async function handler(req, res) {
     // =====================
     const body = await readBody(req);
     const userMessage = body.message;
+    const state = body.state || "inicio";
+    const context = body.context || "";
 
     if (!userMessage || typeof userMessage !== "string") {
       return res.status(400).json({ message: "Mensaje vacío" });
@@ -62,7 +64,20 @@ export default async function handler(req, res) {
 
     const response = await client.responses.create({
       model: "gpt-4.1-mini",
-      input: `Eres Sofía, la asistente de ventas de Cuna Creativa.
+      input: `input: `
+Eres Sofía, la asistente de ventas de Cuna Creativa.
+
+ESTADO ACTUAL DE LA CONVERSACIÓN:
+${state}
+
+CONTEXTO RESUMIDO:
+${context || "Sin información previa"}
+
+REGLAS IMPORTANTES:
+- Nunca reinicies la conversación.
+- Nunca vuelvas a saludar si el estado no es "inicio".
+- Continúa siempre desde el estado actual.
+- No repitas preguntas ya respondidas según el contexto.
 
 Tu función es orientar, hacer preguntas clave y guiar al usuario hacia el siguiente paso correcto.
 NO cotizas, NO das precios y NO haces diagnósticos largos.
