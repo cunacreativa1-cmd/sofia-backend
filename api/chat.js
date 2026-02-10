@@ -19,8 +19,18 @@ export default async function handler(req, res) {
       throw new Error("OPENAI_API_KEY no definida");
     }
 
-    const body = req.body ?? {};
-    const userMessage = body.message;
+  let userMessage = "";
+
+    if (typeof req.body === "string") {
+      const parsed = JSON.parse(req.body);
+      userMessage = parsed.message;
+    } else {
+      userMessage = req.body?.message;
+    }
+
+    if (!userMessage) {
+      return res.status(400).json({ message: "Mensaje vacío" });
+    }
 
     if (!userMessage) {
       return res.status(400).json({ message: "Mensaje vacío" });
