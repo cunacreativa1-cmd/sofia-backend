@@ -1,5 +1,14 @@
 import OpenAI from "openai";
 
+/**
+ * 🔑 IMPORTANTE: forzar bodyParser en Vercel
+ */
+export const config = {
+  api: {
+    bodyParser: true,
+  },
+};
+
 export default async function handler(req, res) {
   // =====================
   // CORS
@@ -18,30 +27,23 @@ export default async function handler(req, res) {
 
   try {
     // =====================
-    // Validar API KEY
+    // API KEY
     // =====================
     if (!process.env.OPENAI_API_KEY) {
       throw new Error("OPENAI_API_KEY no definida");
     }
 
     // =====================
-    // Leer body (blindado)
+    // BODY (ya parseado)
     // =====================
-    let userMessage = "";
+    const userMessage = req.body?.message;
 
-    if (typeof req.body === "string") {
-      const parsed = JSON.parse(req.body);
-      userMessage = parsed.message;
-    } else {
-      userMessage = req.body?.message;
-    }
-
-    if (!userMessage) {
+    if (!userMessage || typeof userMessage !== "string") {
       return res.status(400).json({ message: "Mensaje vacío" });
     }
 
     // =====================
-    // Cliente OpenAI
+    // OpenAI client
     // =====================
     const client = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
@@ -84,16 +86,28 @@ Usuario: ${userMessage}`,
       max_output_tokens: 120,
     });
 
-    const reply =
-      response.output_text ||
-      "¿Te gustaría que continuemos por WhatsApp?";
+    // =====================
+    // Extraer texto (forma segura)
+    // =====================
+    let reply = "";
 
-    // =====================
-    // Respuesta al frontend
-    // =====================
-    return res.status(200).json({
-      message: reply,
-    });
+    if (response.output_text) {
+      reply = response.output_text;
+    } else if (
+      response.output &&
+      response.output[0] &&
+      response.output[0].content &&
+      response.output[0].content[0] &&
+      response.output[0].content[0].text
+    ) {
+      reply = response.output[0].content[0].text;
+    }
+
+    if (!reply) {
+      reply = "¿Te gustaría que continuemos por WhatsApp?";
+    }
+
+    return res.status(200).json({ message: reply });
 
   } catch (error) {
     console.error("❌ BACKEND ERROR:", error);
