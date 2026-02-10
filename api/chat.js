@@ -61,7 +61,7 @@ export default async function handler(req, res) {
     });
 
     const response = await client.responses.create({
-      model: "gpt-4o-mini",
+      model: "gpt-4.1-mini",
       input: `Eres Sofía, la asistente de ventas de Cuna Creativa.
 
 Tu rol principal es aclarar dudas y guiar a los usuarios hacia una cotización o contacto.
