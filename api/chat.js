@@ -1,20 +1,5 @@
 import OpenAI from "openai";
 
-  // =====================
-  // CORS (FIJO PARA VERCEL)
-  // =====================
-  res.setHeader("Access-Control-Allow-Origin", "https://cunacreativa.com");
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader(
-    "Access-Control-Allow-Headers",
-    "Content-Type, Authorization"
-  );
-  res.setHeader("Access-Control-Max-Age", "86400");
-
-    if (req.method === "OPTIONS") {
-     return res.status(200).end();
-   }
-
 /**
  * 🔴 IMPORTANTE
  * NO usamos req.body
@@ -38,18 +23,37 @@ async function readBody(req) {
 }
 
 export default async function handler(req, res) {
- 
-   if (req.method !== "POST") {
-     return res.status(405).json({ message: "Method not allowed" });
-   }
 
-   try {
-     if (!process.env.OPENAI_API_KEY) {
-       throw new Error("OPENAI_API_KEY no definida");
-     }
+  // =====================
+  // CORS — SIEMPRE PRIMERO
+  // =====================
+  res.setHeader("Access-Control-Allow-Origin", "https://cunacreativa.com");
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader(
+    "Access-Control-Allow-Headers",
+    "Content-Type, Authorization"
+  );
+  res.setHeader("Access-Control-Max-Age", "86400");
+
+  // 🔓 Preflight
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
+
+  // =====================
+  // SOLO POST
+  // =====================
+  if (req.method !== "POST") {
+    return res.status(405).json({ message: "Method not allowed" });
+  }
+
+  try {
+    if (!process.env.OPENAI_API_KEY) {
+      throw new Error("OPENAI_API_KEY no definida");
+    }
 
     // =====================
-    // BODY REAL
+    // BODY
     // =====================
     const body = await readBody(req);
     const userMessage = body.message;
@@ -68,8 +72,8 @@ export default async function handler(req, res) {
     });
 
     const response = await client.responses.create({
-      model: "gpt-4.1-mini",
-      input: `input: `
+      model: "gpt-4.1", // ✅ modelo válido
+      input: `
 Eres Sofía, la asistente de ventas de Cuna Creativa.
 
 ESTADO ACTUAL DE LA CONVERSACIÓN:
@@ -102,7 +106,6 @@ Si el usuario pregunta sobre cualquier otro tema:
 - No desarrollas el tema.
 
 REGLAS CLAVE DE CONVERSACIÓN:
-
 1. Nunca repitas una pregunta que el usuario ya respondió.
 2. Nunca preguntes "¿qué servicio te interesa?" si el usuario ya lo especificó.
 3. No ofreces cotización hasta entender claramente la necesidad del usuario.
@@ -122,20 +125,20 @@ IMPORTANTE:
 - No inventas servicios.
 - No asumes información que el usuario no ha dado.
 
-Usuario: ${userMessage}`,
+MENSAJE DEL USUARIO:
+${userMessage}
+      `,
       max_output_tokens: 120,
     });
 
     // =====================
-    // RESPUESTA SEGURA
+    // RESPUESTA
     // =====================
     let reply = "";
 
     if (response.output_text) {
       reply = response.output_text;
-    } else if (
-      response.output?.[0]?.content?.[0]?.text
-    ) {
+    } else if (response.output?.[0]?.content?.[0]?.text) {
       reply = response.output[0].content[0].text;
     }
 
