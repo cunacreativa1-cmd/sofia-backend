@@ -72,7 +72,7 @@ export default async function handler(req, res) {
     });
 
     const response = await client.responses.create({
-      model: "gpt-4o-mini", // ✅ modelo válido
+      model: "gpt-3.5-turbo", // ✅ modelo válido
       input: `
 Eres Sofía, la asistente de ventas de Cuna Creativa.
 
