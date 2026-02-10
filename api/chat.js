@@ -1,5 +1,20 @@
 import OpenAI from "openai";
 
+  // =====================
+  // CORS (FIJO PARA VERCEL)
+  // =====================
+  res.setHeader("Access-Control-Allow-Origin", "https://cunacreativa.com");
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader(
+    "Access-Control-Allow-Headers",
+    "Content-Type, Authorization"
+  );
+  res.setHeader("Access-Control-Max-Age", "86400");
+
+    if (req.method === "OPTIONS") {
+     return res.status(200).end();
+   }
+
 /**
  * 🔴 IMPORTANTE
  * NO usamos req.body
@@ -23,25 +38,6 @@ async function readBody(req) {
 }
 
 export default async function handler(req, res) {
-
-  // =====================
- // CORS (FIJO PARA VERCEL)
- // =====================
- res.setHeader("Access-Control-Allow-Origin", "https://cunacreativa.com");
- res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
- res.setHeader(
-   "Access-Control-Allow-Headers",
-   "Content-Type, Authorization"
- );
- res.setHeader("Access-Control-Max-Age", "86400");
-
-   if (req.method === "OPTIONS") {
-     return res.status(200).end();
-   }
-
-   if (req.method === "OPTIONS") {
-     return res.status(200).end();
-   }
  
    if (req.method !== "POST") {
      return res.status(405).json({ message: "Method not allowed" });
