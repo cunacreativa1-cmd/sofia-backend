@@ -1,5 +1,9 @@
 import OpenAI from "openai";
 
+export default async function handler(req, res) {
+  res.status(200).json({ message: "Backend OK" });
+}
+
 /**
  * 🔴 IMPORTANTE
  * Leemos el body manualmente (Vercel serverless)
