@@ -1,12 +1,7 @@
 import OpenAI from "openai";
 
-export default async function handler(req, res) {
-  res.status(200).json({ message: "Backend OK" });
-}
-
 /**
- * 🔴 IMPORTANTE
- * Leemos el body manualmente (Vercel serverless)
+ * Leer body manualmente (Vercel serverless)
  */
 async function readBody(req) {
   return new Promise((resolve, reject) => {
@@ -30,9 +25,9 @@ async function readBody(req) {
 
 export default async function handler(req, res) {
 
-  // =====================
-  // CORS
-  // =====================
+  /* =====================
+     CORS (OBLIGATORIO)
+  ===================== */
   res.setHeader("Access-Control-Allow-Origin", "https://cunacreativa.com");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader(
@@ -41,6 +36,7 @@ export default async function handler(req, res) {
   );
   res.setHeader("Access-Control-Max-Age", "86400");
 
+  // Preflight
   if (req.method === "OPTIONS") {
     return res.status(200).end();
   }
@@ -54,15 +50,13 @@ export default async function handler(req, res) {
       throw new Error("OPENAI_API_KEY no definida");
     }
 
-    // =====================
-    // BODY
-    // =====================
+    /* =====================
+       BODY
+    ===================== */
     const body = await readBody(req);
-    const userMessage = body.message;
+    const userMessage = body.message || "";
     const state = body.state || "inicio";
-    const context = body.context || "";
 
-    // 👉 datos del lead (vienen del frontend)
     const leadData = body.leadData || {
       name: null,
       email: null,
@@ -75,61 +69,67 @@ export default async function handler(req, res) {
       return res.status(400).json({ message: "Mensaje vacío" });
     }
 
-    // =====================
-    // OpenAI
-    // =====================
+    /* =====================
+       OPENAI CLIENT
+    ===================== */
     const client = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
     });
 
-    // =====================
-    // INSTRUCCIÓN DINÁMICA
-    // =====================
+    /* =====================
+       INSTRUCCIÓN DINÁMICA
+    ===================== */
     let dynamicInstruction = "";
 
     if (userDeclinedData) {
       dynamicInstruction =
-        "El usuario NO desea compartir datos. No los pidas y brinda solo información general.";
+        "El usuario no desea compartir datos. No los pidas y brinda solo información.";
     } else if (!leadData.name) {
-      dynamicInstruction = "Pide el nombre del usuario de forma natural.";
+      dynamicInstruction =
+        "Después de responder y aclarar dudas, puedes pedir el nombre de forma natural.";
     } else if (!leadData.email) {
-      dynamicInstruction = "Pide el correo electrónico del usuario.";
+      dynamicInstruction =
+        "Después de ayudar, puedes pedir el correo electrónico de forma opcional.";
     } else if (!leadData.phone) {
-      dynamicInstruction = "Pide el teléfono del usuario.";
+      dynamicInstruction =
+        "Después de ayudar, puedes pedir el teléfono sin insistir.";
     } else {
       dynamicInstruction =
-        "Ya tienes nombre, correo y teléfono. Ahora puedes compartir el WhatsApp.";
+        "Ya cuentas con los datos. Continúa informando sin vender agresivamente.";
     }
 
+    /* =====================
+       OPENAI REQUEST
+    ===================== */
     const response = await client.responses.create({
-  model: "gpt-4.1-mini",
-  input: `
+      model: "gpt-4.1-mini",
+      input: `
 Eres Sofía, la asistente virtual de Cuna Creativa.
 
 ROL:
 - Asistente informativa y de acompañamiento.
 - Primero SIEMPRE respondes dudas.
-- Después de ayudar, puedes solicitar datos de contacto de forma natural.
+- Luego, solo si es natural, solicitas datos de contacto.
 
 COMPORTAMIENTO CLAVE:
-- Si el usuario hace una pregunta directa, RESPONDES. No preguntas.
-- Si el usuario pide información, EXPLICAS sin devolver preguntas genéricas.
-- Solo haces UNA pregunta a la vez y solo si es necesaria.
-- Nunca repites saludos.
+- Si el usuario hace una pregunta directa, RESPONDES. No devuelves preguntas.
+- Si el usuario pide información, EXPLICAS.
+- No repites saludos.
+- No presionas ventas.
+- No insistes en WhatsApp.
 
-FLUJO DE DATOS:
+FLUJO ACTUAL:
 ${dynamicInstruction}
 
-DATOS DEL USUARIO:
+DATOS ACTUALES:
 Nombre: ${leadData.name || "No proporcionado"}
 Correo: ${leadData.email || "No proporcionado"}
 Teléfono: ${leadData.phone || "No proporcionado"}
 
 REGLAS IMPORTANTES:
-- Puedes hablar de precios SOLO en rangos orientativos.
-- Nunca des cifras cerradas ni cotizaciones.
-- No insistas si el usuario no quiere dejar datos.
-- Si el usuario dice “solo información”, respetas eso.
+- Puedes mencionar precios solo como rangos orientativos.
+- Nunca cotizaciones exactas.
+- Si el usuario dice “solo información”, lo respetas.
 
 ESTILO:
 - Claro
@@ -146,18 +146,13 @@ TEMAS:
 
 MENSAJE DEL USUARIO:
 ${userMessage}
-  `,
-  max_output_tokens: 180,
-});
-MENSAJE DEL USUARIO:
-${userMessage}
       `,
-      max_output_tokens: 120,
+      max_output_tokens: 200,
     });
 
-    // =====================
-    // RESPUESTA
-    // =====================
+    /* =====================
+       RESPUESTA
+    ===================== */
     let reply = "";
 
     if (response.output_text) {
@@ -167,16 +162,17 @@ ${userMessage}
     }
 
     if (!reply) {
-      reply = "¿En qué más puedo ayudarte?";
+      reply = "Puedo ayudarte con información sobre nuestros servicios.";
     }
 
     return res.status(200).json({ message: reply });
 
   } catch (error) {
     console.error("❌ BACKEND ERROR:", error);
+
     return res.status(500).json({
       message:
-        "Estoy teniendo un problema técnico. ¿Prefieres que sigamos por WhatsApp?",
+        "Estoy teniendo un problema técnico en este momento. Intenta nuevamente en unos minutos.",
     });
   }
 }
