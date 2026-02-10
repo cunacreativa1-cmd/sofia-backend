@@ -1,13 +1,26 @@
 import OpenAI from "openai";
 
 /**
- * 🔑 IMPORTANTE: forzar bodyParser en Vercel
+ * 🔴 IMPORTANTE
+ * NO usamos req.body
+ * Leemos el body manualmente (Vercel serverless sin Next.js)
  */
-export const config = {
-  api: {
-    bodyParser: true,
-  },
-};
+async function readBody(req) {
+  return new Promise((resolve, reject) => {
+    let data = "";
+    req.on("data", chunk => {
+      data += chunk;
+    });
+    req.on("end", () => {
+      try {
+        resolve(JSON.parse(data || "{}"));
+      } catch (err) {
+        reject(err);
+      }
+    });
+    req.on("error", err => reject(err));
+  });
+}
 
 export default async function handler(req, res) {
   // =====================
@@ -26,32 +39,27 @@ export default async function handler(req, res) {
   }
 
   try {
-    // =====================
-    // API KEY
-    // =====================
     if (!process.env.OPENAI_API_KEY) {
       throw new Error("OPENAI_API_KEY no definida");
     }
 
     // =====================
-    // BODY (ya parseado)
+    // BODY REAL
     // =====================
-    const userMessage = req.body?.message;
+    const body = await readBody(req);
+    const userMessage = body.message;
 
     if (!userMessage || typeof userMessage !== "string") {
       return res.status(400).json({ message: "Mensaje vacío" });
     }
 
     // =====================
-    // OpenAI client
+    // OpenAI
     // =====================
     const client = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
     });
 
-    // =====================
-    // Prompt + respuesta
-    // =====================
     const response = await client.responses.create({
       model: "gpt-4o-mini",
       input: `Eres Sofía, la asistente de ventas de Cuna Creativa.
@@ -68,18 +76,9 @@ Si el usuario pregunta sobre cualquier otro tema:
 - Indicas que para más información debe contactar por WhatsApp.
 - No desarrollas el tema.
 
-COMPORTAMIENTO:
-- Actúas como asistente de ventas, no como consultora.
-- Primero aclaras dudas básicas.
-- Luego explicas brevemente por qué Cuna Creativa es una buena solución.
-- Después preguntas si desean cotizar.
-
 REGLAS:
 - No das precios, paquetes ni presupuestos.
 - La información de costos solo se da por WhatsApp.
-- Si el usuario acepta cotizar, solicitas: nombre, correo y teléfono.
-- Si no desea dejar datos, no insistes.
-- Los rechazos siempre son cordiales.
 - No mencionas que eres una IA ni que usas ChatGPT.
 
 Usuario: ${userMessage}`,
@@ -87,18 +86,14 @@ Usuario: ${userMessage}`,
     });
 
     // =====================
-    // Extraer texto (forma segura)
+    // RESPUESTA SEGURA
     // =====================
     let reply = "";
 
     if (response.output_text) {
       reply = response.output_text;
     } else if (
-      response.output &&
-      response.output[0] &&
-      response.output[0].content &&
-      response.output[0].content[0] &&
-      response.output[0].content[0].text
+      response.output?.[0]?.content?.[0]?.text
     ) {
       reply = response.output[0].content[0].text;
     }
