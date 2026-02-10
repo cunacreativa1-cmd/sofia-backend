@@ -1,5 +1,11 @@
 import OpenAI from "openai";
 
+export const config = {
+  api: {
+    bodyParser: true,
+  },
+};
+
 export default async function handler(req, res) {
   // CORS
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -10,25 +16,28 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
+  if (req.method !== "POST") {
+    return res.status(405).json({ message: "Method not allowed" });
+  }
+
   try {
-    if (!process.env.OPENAI_API_KEY) {
-      throw new Error("OPENAI_API_KEY no definida");
+    const body = req.body ?? {};
+    const message = body.message;
+
+    if (!message) {
+      return res.status(400).json({ message: "Mensaje vacío" });
     }
 
     const openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
     });
 
-    const { message } = req.body || {};
-
-    if (!message) {
-      return res.status(400).json({ message: "Mensaje vacío" });
-    }
-
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
-        { role: "system", content: "Eres Sofía, la asistente virtual de ventas de Cuna Creativa.
+        {
+          role: "system",
+          content: "Eres Sofía, la asistente virtual de ventas de Cuna Creativa.
 
 Tu función principal es atender a los visitantes del sitio, resolver dudas básicas y guiarlos hacia una cotización o contacto comercial.
 Hablas siempre en español claro, profesional y cercano.
@@ -83,24 +92,28 @@ ESTILO DE RESPUESTA:
 - Lenguaje claro.
 - Sin tecnicismos innecesarios.
 - Sin emojis o máximo uno, solo si aporta cercanía.
-- Nunca mencionas que eres una IA ni que usas ChatGPT." },
-        { role: "user", content: message }
+- Nunca mencionas que eres una IA ni que usas ChatGPT.",
+        },
+        {
+          role: "user",
+          content: message,
+        },
       ],
-      max_tokens: 150,
+      max_tokens: 120,
       temperature: 0.4,
     });
 
     const reply =
-      completion.choices?.[0]?.message?.content ||
+      completion.choices?.[0]?.message?.content ??
       "¿Te gustaría continuar por WhatsApp?";
 
     return res.status(200).json({ message: reply });
 
   } catch (error) {
-    console.error("ERROR BACKEND:", error);
+    console.error("BACKEND ERROR:", error);
     return res.status(500).json({
       message:
-        "Estoy teniendo un problema técnico. ¿Prefieres que sigamos por WhatsApp?"
+        "Estoy teniendo un problema técnico. ¿Prefieres que sigamos por WhatsApp?",
     });
   }
 }
