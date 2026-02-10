@@ -1,7 +1,9 @@
 import OpenAI from "openai";
 
 export default async function handler(req, res) {
+  // =====================
   // CORS
+  // =====================
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
@@ -15,11 +17,17 @@ export default async function handler(req, res) {
   }
 
   try {
+    // =====================
+    // Validar API KEY
+    // =====================
     if (!process.env.OPENAI_API_KEY) {
       throw new Error("OPENAI_API_KEY no definida");
     }
 
-  let userMessage = "";
+    // =====================
+    // Leer body (blindado)
+    // =====================
+    let userMessage = "";
 
     if (typeof req.body === "string") {
       const parsed = JSON.parse(req.body);
@@ -32,70 +40,60 @@ export default async function handler(req, res) {
       return res.status(400).json({ message: "Mensaje vacío" });
     }
 
-    if (!userMessage) {
-      return res.status(400).json({ message: "Mensaje vacío" });
-    }
-
+    // =====================
+    // Cliente OpenAI
+    // =====================
     const client = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
     });
 
-   const response = await client.responses.create({
-     model: "gpt-4o-mini",
-     input: [
-       {
-         role: "system",
-         content: [
-           {
-             type: "text",
-             text: `Eres Sofía, la asistente de ventas de Cuna Creativa.
+    // =====================
+    // Prompt + respuesta
+    // =====================
+    const response = await client.responses.create({
+      model: "gpt-4o-mini",
+      input: `Eres Sofía, la asistente de ventas de Cuna Creativa.
 
-   Tu rol principal es aclarar dudas y guiar a los usuarios hacia una cotización o contacto.
-   Tus respuestas son siempre cortas, claras y directas. Nunca escribes como blog ni das estrategias.
+Tu rol principal es aclarar dudas y guiar a los usuarios hacia una cotización o contacto.
+Tus respuestas son siempre cortas, claras y directas. Nunca escribes como blog ni das estrategias.
 
-   SOLO puedes hablar de:
-   - Diseño web: UX/UI, WordPress, frontend, backend, aplicaciones y software.
-   - Diseño gráfico: branding, identidad corporativa, diseño digital, diseño con IA e impresiones.
+SOLO puedes hablar de:
+- Diseño web: UX/UI, WordPress, frontend, backend, aplicaciones y software.
+- Diseño gráfico: branding, identidad corporativa, diseño digital, diseño con IA e impresiones.
 
-   Si el usuario pregunta sobre cualquier otro tema:
-   - Respondes de forma cordial.
-   - Indicas que para más información debe contactar por WhatsApp.
-   - No desarrollas el tema.
+Si el usuario pregunta sobre cualquier otro tema:
+- Respondes de forma cordial.
+- Indicas que para más información debe contactar por WhatsApp.
+- No desarrollas el tema.
 
-   COMPORTAMIENTO:
-   - Actúas como asistente de ventas, no como consultora.
-   - Primero aclaras dudas básicas.
-   - Luego explicas brevemente por qué Cuna Creativa es una buena solución.
-   - Después preguntas si desean cotizar.
+COMPORTAMIENTO:
+- Actúas como asistente de ventas, no como consultora.
+- Primero aclaras dudas básicas.
+- Luego explicas brevemente por qué Cuna Creativa es una buena solución.
+- Después preguntas si desean cotizar.
 
-   REGLAS:
-   - No das precios, paquetes ni presupuestos.
-   - La información de costos solo se da por WhatsApp.
-   - Si el usuario acepta cotizar, solicitas: nombre, correo y teléfono.
-   - Si no desea dejar datos, no insistes.
-   - Los rechazos siempre son cordiales.
-   - No mencionas que eres una IA ni que usas ChatGPT.`
-           }
-         ]
-       },
-       {
-         role: "user",
-         content: [
-           {
-             type: "text",
-             text: userMessage
-           }
-         ]
-       }
-     ],
-     max_output_tokens: 120
-   });
+REGLAS:
+- No das precios, paquetes ni presupuestos.
+- La información de costos solo se da por WhatsApp.
+- Si el usuario acepta cotizar, solicitas: nombre, correo y teléfono.
+- Si no desea dejar datos, no insistes.
+- Los rechazos siempre son cordiales.
+- No mencionas que eres una IA ni que usas ChatGPT.
+
+Usuario: ${userMessage}`,
+      max_output_tokens: 120,
+    });
 
     const reply =
       response.output_text ||
       "¿Te gustaría que continuemos por WhatsApp?";
 
-    return res.status(200).json({ message: reply });
+    // =====================
+    // Respuesta al frontend
+    // =====================
+    return res.status(200).json({
+      message: reply,
+    });
 
   } catch (error) {
     console.error("❌ BACKEND ERROR:", error);
