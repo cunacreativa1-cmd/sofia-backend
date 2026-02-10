@@ -2,15 +2,16 @@ import OpenAI from "openai";
 
 /**
  * 🔴 IMPORTANTE
- * NO usamos req.body
- * Leemos el body manualmente (Vercel serverless sin Next.js)
+ * Leemos el body manualmente (Vercel serverless)
  */
 async function readBody(req) {
   return new Promise((resolve, reject) => {
     let data = "";
+
     req.on("data", chunk => {
       data += chunk;
     });
+
     req.on("end", () => {
       try {
         resolve(JSON.parse(data || "{}"));
@@ -18,6 +19,7 @@ async function readBody(req) {
         reject(err);
       }
     });
+
     req.on("error", err => reject(err));
   });
 }
@@ -25,7 +27,7 @@ async function readBody(req) {
 export default async function handler(req, res) {
 
   // =====================
-  // CORS — SIEMPRE PRIMERO
+  // CORS
   // =====================
   res.setHeader("Access-Control-Allow-Origin", "https://cunacreativa.com");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
@@ -35,14 +37,10 @@ export default async function handler(req, res) {
   );
   res.setHeader("Access-Control-Max-Age", "86400");
 
-  // 🔓 Preflight
   if (req.method === "OPTIONS") {
     return res.status(200).end();
   }
 
-  // =====================
-  // SOLO POST
-  // =====================
   if (req.method !== "POST") {
     return res.status(405).json({ message: "Method not allowed" });
   }
@@ -60,6 +58,15 @@ export default async function handler(req, res) {
     const state = body.state || "inicio";
     const context = body.context || "";
 
+    // 👉 datos del lead (vienen del frontend)
+    const leadData = body.leadData || {
+      name: null,
+      email: null,
+      phone: null
+    };
+
+    const userDeclinedData = body.userDeclinedData || false;
+
     if (!userMessage || typeof userMessage !== "string") {
       return res.status(400).json({ message: "Mensaje vacío" });
     }
@@ -71,59 +78,57 @@ export default async function handler(req, res) {
       apiKey: process.env.OPENAI_API_KEY,
     });
 
+    // =====================
+    // INSTRUCCIÓN DINÁMICA
+    // =====================
+    let dynamicInstruction = "";
+
+    if (userDeclinedData) {
+      dynamicInstruction =
+        "El usuario NO desea compartir datos. No los pidas y brinda solo información general.";
+    } else if (!leadData.name) {
+      dynamicInstruction = "Pide el nombre del usuario de forma natural.";
+    } else if (!leadData.email) {
+      dynamicInstruction = "Pide el correo electrónico del usuario.";
+    } else if (!leadData.phone) {
+      dynamicInstruction = "Pide el teléfono del usuario.";
+    } else {
+      dynamicInstruction =
+        "Ya tienes nombre, correo y teléfono. Ahora puedes compartir el WhatsApp.";
+    }
+
     const response = await client.responses.create({
-      model: "gpt-3.5-turbo", // ✅ modelo válido
+      model: "gpt-3.5-turbo",
       input: `
 Eres Sofía, la asistente de ventas de Cuna Creativa.
 
-ESTADO ACTUAL DE LA CONVERSACIÓN:
+ESTADO ACTUAL:
 ${state}
 
-CONTEXTO RESUMIDO:
+CONTEXTO:
 ${context || "Sin información previa"}
 
-REGLAS IMPORTANTES:
-- Nunca reinicies la conversación.
-- Nunca vuelvas a saludar si el estado no es "inicio".
-- Continúa siempre desde el estado actual.
-- No repitas preguntas ya respondidas según el contexto.
+INSTRUCCIÓN ACTUAL:
+${dynamicInstruction}
 
-Tu función es orientar, hacer preguntas clave y guiar al usuario hacia el siguiente paso correcto.
-NO cotizas, NO das precios y NO haces diagnósticos largos.
+REGLAS DE CONVERSACIÓN:
+- SOLO saluda si el estado es "inicio".
+- Nunca repitas “Hola” si el estado NO es "inicio".
+- No reinicies la conversación.
+- No repitas preguntas ya respondidas.
+- Sé natural, breve y conversacional.
 
-Tu estilo:
-- Respuestas cortas, claras y naturales.
-- Conversacional, profesional y cercana.
-- Nunca escribes como blog ni das estrategias extensas.
+CAPTURA DE CONTACTO:
+- Pide nombre, correo y teléfono UNO POR UNO.
+- Cada dato se pide SOLO UNA VEZ.
+- Si el usuario se niega, NO insistas.
+- Si no desea dar datos, continúa ayudando sin WhatsApp.
+- WhatsApp solo cuando el lead esté completo.
 
-SOLO puedes hablar de:
-- Diseño web: UX/UI, WordPress, frontend, backend, aplicaciones y software.
-- Diseño gráfico: branding, identidad corporativa, diseño digital, diseño con IA e impresiones.
-
-Si el usuario pregunta sobre cualquier otro tema:
-- Respondes de forma cordial.
-- Indicas que para más información debe contactar por WhatsApp.
-- No desarrollas el tema.
-
-REGLAS CLAVE DE CONVERSACIÓN:
-1. Nunca repitas una pregunta que el usuario ya respondió.
-2. Nunca preguntes "¿qué servicio te interesa?" si el usuario ya lo especificó.
-3. No ofreces cotización hasta entender claramente la necesidad del usuario.
-4. Antes de dirigir a WhatsApp, haces entre 2 y 4 preguntas breves para calificar el proyecto.
-5. No mencionas WhatsApp en los primeros mensajes si el usuario solo está explorando información.
-6. Solo diriges a WhatsApp cuando:
-   - El usuario pide una cotización, O
-   - Ya existe claridad sobre el proyecto.
-
-SOBRE COTIZACIONES:
-- Nunca das precios, paquetes ni presupuestos.
-- Explicas que la cotización se realiza únicamente por WhatsApp.
-- Usas WhatsApp como cierre natural, no como salida rápida.
-
-IMPORTANTE:
-- No mencionas que eres una IA ni que usas ChatGPT.
-- No inventas servicios.
-- No asumes información que el usuario no ha dado.
+LIMITES:
+- No das precios ni cotizaciones.
+- No escribes como blog.
+- No mencionas que eres una IA.
 
 MENSAJE DEL USUARIO:
 ${userMessage}
@@ -143,7 +148,7 @@ ${userMessage}
     }
 
     if (!reply) {
-      reply = "¿Te gustaría que continuemos por WhatsApp?";
+      reply = "¿En qué más puedo ayudarte?";
     }
 
     return res.status(200).json({ message: reply });
